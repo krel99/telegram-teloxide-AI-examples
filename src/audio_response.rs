@@ -10,7 +10,6 @@ use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
 const MODEL_OPENAI: &str = "gpt-4o-mini";
 const OPENAI_ENV_NAME: &str = "OPENAI_API_KEY";
 
-type MyDialogue = Dialogue<State, InMemStorage<State>>;
 type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 // Default - instance creator
@@ -21,7 +20,7 @@ pub enum State {
     #[default]
     Start,
     Question {
-        fullQuestion: String,
+        full_question: String,
     },
 }
 
@@ -48,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn start(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
+async fn start(bot: Bot, msg: Message) -> HandlerResult {
     match msg.text() {
         Some(text) => {
             let eleven_labs_key = env::var("ELEVENLABS_API_KEY")
