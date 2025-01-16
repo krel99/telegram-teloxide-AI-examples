@@ -12,6 +12,10 @@ path = "src/text_response.rs"
 name = "stateless_voice_chat"
 path = "src/audio_response.rs"
 
+[[bin]]
+name = "stateful_chat"
+path = "src/text_response_stateful.rs"
+
 [dependencies]
 teloxide = { version = "0.13", features = ["macros", "ctrlc_handler"] }
 log = "0.4"
