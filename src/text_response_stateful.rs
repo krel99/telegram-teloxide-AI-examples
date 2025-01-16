@@ -41,18 +41,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .dispatch()
     .await;
 
+    println!("DISPATCHER ended");
+
     Ok(())
 }
 
 async fn start(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
+    println!("fn START");
     match msg.text() {
         Some(text) => {
             let existing_dialogue = dialogue.get().await;
 
-            let mut chat_req = ChatRequest::new(vec![
-                ChatMessage::system("Answer on the level of A1 speaker, then make open-ended statement or ask question."),
-                ChatMessage::user(text),
-            ]);
+            let mut chat_req = if let Ok(Some(State::Conversation { messages })) = existing_dialogue
+            {
+                let mut new_messages = messages.messages.clone();
+                new_messages.push(ChatMessage::user(text));
+                ChatRequest::new(new_messages)
+            } else {
+                ChatRequest::new(vec![
+                    ChatMessage::system("Answer on the level of A1 speaker, then make open-ended statement or ask question."),
+                    ChatMessage::user(text),
+                ])
+            };
+
+            // let mut chat_req = ChatRequest::new(vec![
+            //     ChatMessage::system("Answer on the level of A1 speaker, then make open-ended statement or ask question."),
+            //     ChatMessage::user(text),
+            // ]);
 
             // To print a Vec of ChatMessages, we iterate through and print each
 
