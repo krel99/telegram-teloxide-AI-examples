@@ -1,6 +1,8 @@
 use dotenv::dotenv;
 use genai::chat::{ChatMessage, ChatRequest};
 use genai::Client;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
 use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
 
 const MODEL_OPENAI: &str = "gpt-4o-mini";
@@ -9,29 +11,20 @@ const OPENAI_ENV_NAME: &str = "OPENAI_API_KEY";
 type MyDialogue = Dialogue<State, InMemStorage<State>>;
 type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
-// #[derive(Clone)]
-// pub struct MyChatRequest {
-//     messages: Vec<ChatMessage>,
-// }
-
-// impl MyChatRequest {
-//     pub fn new(messages: Vec<ChatMessage>) -> Self {
-//         Self { messages }
-//     }
-
-//     pub fn add_message(&mut self, message: ChatMessage) {
-//         self.messages.push(message);
-//     }
-// }
-
 #[derive(Clone, Default)]
 pub enum State {
     #[default]
     Start,
     Conversation,
-    MyChatRequest {
-        messages: ChatRequest,
-    },
+}
+
+lazy_static! {
+    static ref CHATHISTORY: Mutex<ChatRequest> = Mutex::new(ChatRequest::new(vec![
+        ChatMessage::system(
+            "Answer on the level of A1 speaker, then make open-ended statement or ask question."
+        ),
+        ChatMessage::user("Initial message"),
+    ]));
 }
 
 #[tokio::main] // how comes I don't need to import this?
@@ -80,11 +73,10 @@ async fn start(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
             bot.send_message(msg.chat.id, res.clone()).await?;
             chat_req.messages.push(ChatMessage::assistant(res));
 
-            dialogue
-                .update(State::MyChatRequest {
-                    messages: chat_req.clone(),
-                })
-                .await?;
+            {
+                let mut chat_history = CHATHISTORY.lock().unwrap();
+                *chat_history = chat_req.clone();
+            }
 
             dialogue.update(State::Conversation).await?;
 
@@ -103,18 +95,16 @@ async fn conversation(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerRe
     println!("fn CONVERSATION");
     match msg.text() {
         Some(text) => {
-            let existing_dialogue = dialogue.get().await;
+            let mut chat_req = {
+                let chat_history = CHATHISTORY.lock().unwrap();
+                let mut new_messages = chat_history.messages.clone();
+                new_messages.push(ChatMessage::user(text));
+                ChatRequest::new(new_messages)
+            };
 
-            // let mut chat_req =  dialogue::storage::InMemStorage::
-            let mut chat_req =
-                if let Ok(Some(State::MyChatRequest { messages })) = existing_dialogue {
-                    let mut new_messages = messages.messages.clone();
-                    new_messages.push(ChatMessage::user(text));
-                    ChatRequest::new(new_messages)
-                } else {
-                    println!("Probably writing too fast");
-                    panic!("");
-                };
+            for message in &chat_req.messages {
+                println!("{:?}", message);
+            }
 
             // To print a Vec of ChatMessages, we iterate through and print each
 
@@ -130,11 +120,10 @@ async fn conversation(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerRe
             bot.send_message(msg.chat.id, res.clone()).await?;
             chat_req.messages.push(ChatMessage::assistant(res));
 
-            dialogue
-                .update(State::MyChatRequest {
-                    messages: chat_req.clone(),
-                })
-                .await?;
+            {
+                let mut chat_history = CHATHISTORY.lock().unwrap();
+                *chat_history = chat_req.clone();
+            }
 
             dialogue.update(State::Conversation).await?;
 
